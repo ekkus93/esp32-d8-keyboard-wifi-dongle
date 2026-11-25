@@ -69,3 +69,7 @@ Testing/
 
 # Serena (local tool config)
 .serena/
+
+# Python
+.venv/
+__pycache__/
