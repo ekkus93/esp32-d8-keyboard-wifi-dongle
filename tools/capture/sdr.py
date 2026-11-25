@@ -65,6 +65,31 @@ class Sdr:
         return a[:, 0] - 1j * a[:, 1], us  # negate wire Q
 
 
+    def ringcap(self, units: int = 3, rate: int = 6, conj: bool = True) -> tuple[np.ndarray, list[int], str]:
+        """Gap-free raw capture (up to 3 x 16384 samples). Words: I = bits 0-9,
+        Q = bits 10-19, signed 10-bit. conj=True negates Q, matching CAP16's
+        standard orientation (verify against a known tone)."""
+        self.s.write(f"RINGCAP {units} {rate}\n".encode())
+        old = self.s.timeout
+        self.s.timeout = 10
+        try:
+            head = self.s.readline().decode(errors="replace").strip()
+            if not head.startswith("RINGDATA"):
+                raise RuntimeError(head)
+            _, u, _rate_hz, n0, n1, n2, crc = head.split()
+            counts = [int(n) for n in (n0, n1, n2)][: int(u)]
+            raw = self._read_exact(4 * sum(counts))
+            if zlib.crc32(raw) & 0xFFFFFFFF != int(crc, 16):
+                raise RuntimeError("RINGDATA CRC mismatch")
+            report = self.s.readline().decode(errors="replace").strip()
+        finally:
+            self.s.timeout = old
+        w = np.frombuffer(raw, "<u4").astype(np.uint32)
+        i = ((w << 22).astype(np.int32) >> 22).astype(np.float32)
+        q = ((w << 12).astype(np.int32) >> 22).astype(np.float32)
+        return (i - 1j * q) if conj else (i + 1j * q), counts, report
+
+
 def save(path: Path, iq: np.ndarray, meta: dict) -> None:
     np.save(path.with_suffix(".npy"), iq.astype(np.complex64))
     path.with_suffix(".json").write_text(json.dumps(meta, indent=1))
