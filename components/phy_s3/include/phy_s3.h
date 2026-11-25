@@ -9,7 +9,7 @@
  * Adapted and modified for this project.
  *
  * esp32-d8-receiver modifications (2026-11-25), from screenbar-halo-bridge 67deba5:
- * runtime carrier (phy_s3_set_carrier).
+ * runtime carrier (phy_s3_set_carrier), phy_s3_send_settle.
  */
 #pragma once
 #include <stdbool.h>
@@ -51,6 +51,9 @@ void phy_s3_load(phy_s3_fill_fn fill, void *ctx);
  * first DAC bank, which is why this always reloads.
  */
 phy_s3_tx_result_t phy_s3_send(phy_s3_fill_fn fill, void *ctx, unsigned gain);
+
+/* esp32-d8-receiver: as phy_s3_send, with the TX settle time (default 3000 us) as a parameter. */
+phy_s3_tx_result_t phy_s3_send_settle(phy_s3_fill_fn fill, void *ctx, unsigned gain, unsigned settle_us);
 
 /* Re-tune and settle the receiver (3 ms). halo-esp32s3 does this before and
  * after every command, never between attempts.

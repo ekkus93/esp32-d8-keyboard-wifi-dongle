@@ -7,7 +7,7 @@
  * Commands (one per line, replies start with OK or ERR):
  *   PING
  *   TUNE <mhz> [khz]                      retune + recalibrate (~3 ms)
- *   TXSEARCH <gain 0..10> <count> <interval_ms> [flow_hex]
+ *   TXSEARCH <gain 0..10> <count> <interval_ms>  [flow_hex] [settle_us]  [dev_khz] [if_khz] [lead_samples] [chirp_hz_per_us]
  *       transmit copies of the D8 search frame (51 <flow> 01 00 00 00 00 0c 00 00 10)
  *       on the pairing access code, for TX-path verification with an independent receiver.
  */
@@ -55,31 +55,39 @@ static void cmd_tune(char *args)
 
 static void cmd_txsearch(char *args)
 {
-    unsigned gain = 0, count = 0, interval = 0, flow = 0x40;
-    int n = sscanf(args, "%u %u %u %x", &gain, &count, &interval, &flow);
-    if (n < 3 || gain > MAX_GAIN || count == 0 || count > 1000 || interval > 10000 || flow > 0xff) {
-        printf("ERR args: TXSEARCH <gain 0..10> <count 1..1000> <interval_ms> [flow_hex]\n");
+    unsigned gain = 0, count = 0, interval = 0, flow = 0x40, settle = 3000, dev_khz = 500;
+    int if_khz = 0;
+    unsigned lead = LEAD_SAMPLES;
+    int chirp = 0;
+    int n = sscanf(args, "%u %u %u %x %u %u %d %u %d", &gain, &count, &interval, &flow, &settle, &dev_khz, &if_khz,
+                   &lead, &chirp);
+    if (n < 3 || gain > MAX_GAIN || count == 0 || count > 1000 || interval > 10000 || flow > 0xff || settle > 5000 ||
+        dev_khz < 100 || dev_khz > 1000 || if_khz < -8000 || if_khz > 8000 || lead > 8000 || chirp < -20000 || chirp > 20000) {
+        printf("ERR args: TXSEARCH <gain 0..10> <count 1..1000> <interval_ms> [flow_hex] [settle_us] [dev_khz] [if_khz] [lead] [chirp_hz_us]\n");
         return;
     }
     const uint8_t pay[11] = {0x51, (uint8_t)flow, 0x01, 0, 0, 0, 0, 0x0c, 0, 0, 0x10};
     static uint8_t bits[GFSK_MAX_BITS];
     size_t nbits = esb_build(bits, sizeof bits, PREAMBLE_BITS, &ESB_D8_PAIRING_ADDR, 0, 1, pay, sizeof pay);
-    if (!nbits || LEAD_SAMPLES + nbits * GFSK_SPB > PHY_S3_TX_SAMPLES) {
+    if (!nbits || lead + nbits * GFSK_SPB > PHY_S3_TX_SAMPLES) {
         printf("ERR frame\n");
         return;
     }
-    gfsk_prepare(&g_frame, bits, nbits, LEAD_SAMPLES);
+    gfsk_set_deviation(dev_khz * 1000.0);
+    gfsk_set_if(if_khz * 1000.0);
+    gfsk_set_chirp((double)chirp);
+    gfsk_prepare(&g_frame, bits, nbits, lead);
     unsigned done = 0;
     for (unsigned k = 0; k < count; k++) {
-        phy_s3_tx_result_t r = phy_s3_send(fill_frame, &g_frame, gain);
+        phy_s3_tx_result_t r = phy_s3_send_settle(fill_frame, &g_frame, gain, settle);
         (void)r;
         done++;
         if (interval) {
             vTaskDelay(pdMS_TO_TICKS(interval));
         }
     }
-    printf("OK TXSEARCH sent=%u bits=%u samples=%u carrier=%u%+dkHz gain=%u flow=%02x\n", done, (unsigned)nbits,
-           (unsigned)gfsk_length(&g_frame), cur_mhz, cur_khz, gain, flow);
+    printf("OK TXSEARCH sent=%u bits=%u samples=%u carrier=%u%+dkHz gain=%u flow=%02x settle=%u dev=%u if=%d lead=%u chirp=%d\n", done,
+           (unsigned)nbits, (unsigned)gfsk_length(&g_frame), cur_mhz, cur_khz, gain, flow, settle, dev_khz, if_khz, lead, chirp);
 }
 
 void app_main(void)

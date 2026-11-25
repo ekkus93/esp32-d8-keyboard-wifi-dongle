@@ -7,7 +7,8 @@
  *
  * esp32-d8-receiver modifications (2026-11-25), from screenbar-halo-bridge 67deba5:
  * the fixed carrier define became a runtime carrier (phy_s3_set_carrier), so the
- * radio can follow the D8 keyboard's channels. Register sequences are unchanged.
+ * radio can follow the D8 keyboard's channels; phy_s3_send_settle makes the TX
+ * settle time a parameter. Register sequences are unchanged.
  */
 #include "phy_s3.h"
 #include "phy_s3_hw.h"
@@ -227,6 +228,11 @@ void phy_s3_load(phy_s3_fill_fn fill, void *ctx)
 
 phy_s3_tx_result_t phy_s3_send(phy_s3_fill_fn fill, void *ctx, unsigned gain)
 {
+    return phy_s3_send_settle(fill, ctx, gain, SETTLE_US);
+}
+
+phy_s3_tx_result_t phy_s3_send_settle(phy_s3_fill_fn fill, void *ctx, unsigned gain, unsigned settle_us)
+{
     phy_s3_tx_result_t r = {0};
     if (gain > PHY_S3_GAIN_MAX) {
         return r;
@@ -238,7 +244,7 @@ phy_s3_tx_result_t phy_s3_send(phy_s3_fill_fn fill, void *ctx, unsigned gain)
     force_tx_gain(tx_gains[gain], 0, 0);
     phy_s3_select_lo();
     force_txon_mode(1, 0, 0);
-    esp_rom_delay_us(SETTLE_US);
+    esp_rom_delay_us(settle_us);
 
     uint32_t tx_end = play_banks();
 

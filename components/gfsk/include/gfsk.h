@@ -3,7 +3,7 @@
  *
  * From screenbar-halo-bridge 67deba5 lib/modem (halo_gfsk), modified 2026-11-25 for
  * esp32-d8-receiver: 2 Mbit/s, +-500 kHz (D8 / Telink 2M mode, docs/RF_PROTOCOL.md O5),
- * renamed, and no longer tied to the Halo ESB frame size.
+ * renamed, no longer tied to the Halo ESB frame size; runtime deviation and digital IF.
  *
  * Every sample can be computed on its own because the S3's two DAC banks
  * overlap and get filled out of order.
@@ -36,6 +36,18 @@ typedef struct {
  * calls it anyway if you forget.
  */
 void gfsk_init(void);
+
+/* esp32-d8-receiver: change the peak deviation (default GFSK_DEVIATION) and rebuild the tables.
+ * Frames prepared earlier must be prepared again. */
+void gfsk_set_deviation(double hz);
+
+/* esp32-d8-receiver: shift the waveform by a digital IF (Hz, may be negative) so the DAC/LO
+ * carrier leakage falls outside the channel: tune the LO to channel - IF. */
+void gfsk_set_if(double hz);
+
+/* esp32-d8-receiver: linear frequency ramp (Hz per microsecond from DAC sample 0), to
+ * pre-compensate the S3 transmitter's in-frame carrier drift. */
+void gfsk_set_chirp(double hz_per_us);
 
 void gfsk_prepare(gfsk_t *g, const uint8_t *bits, size_t nbits, size_t lead);
 

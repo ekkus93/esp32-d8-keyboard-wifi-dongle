@@ -18,6 +18,15 @@ _Static_assert(GFSK_RATE % GFSK_BIT_RATE == 0, "whole DAC samples per bit");
 static uint32_t bit_phase[8][SPB + 1];
 static int16_t cos_table[COS_SIZE];
 static bool ready;
+static double deviation_hz = GFSK_DEVIATION;   /* esp32-d8-receiver: runtime-settable */
+static uint32_t if_step;                       /* esp32-d8-receiver: digital IF, phase per DAC sample */
+static int64_t chirp_q16;                      /* esp32-d8-receiver: frequency ramp, phase per sample^2, Q16 */
+
+/* IF + chirp phase at absolute DAC sample n (wraps mod 2^32 like every other phase here). */
+static inline uint32_t extra_phase(size_t n)
+{
+    return (uint32_t)(n * if_step) + (uint32_t)(((int64_t)n * (int64_t)n * chirp_q16) >> 16);
+}
 
 /* Half a Gaussian-filtered edge, 0.5 * erf, from -2 to +2 bits. A bit's shape is two of these, so tabling
  * it means init needs 1280 erf calls instead of six per sample of every pattern. Float gives the same DAC words
@@ -47,7 +56,7 @@ void gfsk_init(void)
                 int bit = (p >> (1 - j)) & 1;
                 level += (bit ? 1.0 : -1.0) * shaped((int)s, j * (int)SPB);
             }
-            cycles += level * GFSK_DEVIATION / GFSK_RATE;
+            cycles += level * deviation_hz / GFSK_RATE;
             bit_phase[p][s + 1] = (uint32_t)(int64_t)llround(cycles * turn);
         }
     }
@@ -95,7 +104,7 @@ void gfsk_sample(const gfsk_t *g, size_t n, int16_t *i, int16_t *q)
         return;
     }
     size_t k = (n - g->lead) / SPB, s = (n - g->lead) % SPB;
-    unsigned idx = cos_index(g->phase[k] + bit_phase[g->pattern[k]][s + 1]);
+    unsigned idx = cos_index(g->phase[k] + bit_phase[g->pattern[k]][s + 1] + extra_phase(n));
     *i = cos_table[idx];
     *q = cos_table[(idx - COS_SIZE / 4) & (COS_SIZE - 1)];   /* sin = cos 90 degrees back */
 }
@@ -111,8 +120,8 @@ void gfsk_fill(const gfsk_t *g, size_t first, uint32_t *out, size_t count)
         for (; count && k < g->nbits; k++, s = 0) {
             const uint32_t *row = bit_phase[g->pattern[k]];
             uint32_t base = g->phase[k];
-            for (; count && s < SPB; s++, count--) {
-                unsigned idx = cos_index(base + row[s + 1]);
+            for (; count && s < SPB; s++, count--, n++) {
+                unsigned idx = cos_index(base + row[s + 1] + extra_phase(n));
                 *out++ = s3_iq_pack(cos_table[idx], cos_table[(idx - COS_SIZE / 4) & (COS_SIZE - 1)]);
             }
         }
@@ -120,4 +129,23 @@ void gfsk_fill(const gfsk_t *g, size_t first, uint32_t *out, size_t count)
     for (; count; count--) {
         *out++ = 0;
     }
+}
+
+void gfsk_set_deviation(double hz)
+{
+    deviation_hz = hz;
+    gfsk_init();   /* rebuild the phase tables */
+}
+
+void gfsk_set_if(double hz)
+{
+    if_step = (uint32_t)(int64_t)llround(hz / GFSK_RATE * 4294967296.0);
+}
+
+void gfsk_set_chirp(double hz_per_us)
+{
+    /* f(t) = rate * t  ->  phase(n) = 0.5 * rate * (n / fs)^2 turns. */
+    double rate = hz_per_us * 1e6;   /* Hz per second */
+    double turns_per_n2 = 0.5 * rate / ((double)GFSK_RATE * (double)GFSK_RATE);
+    chirp_q16 = llround(turns_per_n2 * 4294967296.0 * 65536.0);
 }
