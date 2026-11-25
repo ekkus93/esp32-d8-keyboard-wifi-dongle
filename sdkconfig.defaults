@@ -1,0 +1,43 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# From screenbar-halo-bridge 67deba5 s3/sdkconfig.defaults, modified for esp32-d8-receiver (16 MB flash, lab console).
+CONFIG_IDF_TARGET="esp32s3"
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+# phy_s3 times the DAC and the ADC ring in CPU cycles counted at 240 MHz.
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
+# 1 ms ticks: the listener's worker rests one tick at a time, and the first
+# retry gap is only 5-15 ms.
+CONFIG_FREERTOS_HZ=1000
+CONFIG_COMPILER_OPTIMIZATION_PERF=y
+# Startup only, and freed once app_main returns: room to spare for the PHY's init.
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
+# CONFIG_PM_ENABLE is not set
+
+# The private PHY calls phy_s3 needs only exist with these on.
+CONFIG_ESP_PHY_ENABLE_CERT_TEST=y
+CONFIG_ESP_PHY_DEBUG=y
+
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+CONFIG_ESP_CONSOLE_SECONDARY_NONE=y
+
+# Dual core. The radio task owns core 1 and never yields while the ring runs,
+# so the task watchdog checks core 0's idle task and the radio task checks in itself.
+# A trip reboots: the board has no reset line the C3 could pull.
+# Interrupts stay masked for at most ~2 ms (TX, one-shot capture, and ~1 ms
+# while each ring start waits for its first flip), far under the interrupt
+# watchdog's limit.
+CONFIG_ESP_INT_WDT=y
+CONFIG_ESP_TASK_WDT_EN=y
+CONFIG_ESP_TASK_WDT_PANIC=y
+CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU0=y
+# CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU1 is not set
+
+# Keep the Wi-Fi driver small; it never carries traffic. The three reserved
+# banks take 192 KB of SRAM.
+# CONFIG_ESP_WIFI_IRAM_OPT is not set
+# CONFIG_ESP_WIFI_EXTRA_IRAM_OPT is not set
+# CONFIG_ESP_WIFI_RX_IRAM_OPT is not set
+# CONFIG_ESP_WIFI_SLP_IRAM_OPT is not set
+# CONFIG_ESP_PHY_IRAM_OPT is not set
+# CONFIG_ESP_WIFI_AMPDU_TX_ENABLED is not set
+# CONFIG_ESP_WIFI_AMPDU_RX_ENABLED is not set
+CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM=4

@@ -45,6 +45,13 @@ Reference: Telink keyboard/mouse/dongle SDK snapshot (`8368_keyboard`, `8366_don
 | D4 | Keyboard transmits on the **pairing pipe** with a fixed `did`, i.e. consistent with an SDK keyboard that has no usable stored dongle binding (SDK: bound keyboards send `pkt_km` on pipe 2 with the dongle's access code). `seq_no` stays 0 unlike SDK source (`seq_no++` per loop) — firmware differs from this snapshot | M | D2 |
 | D5 | SDK channels are integer MHz `2400 + table[i]`; search mode steps index `(i+6)&14`. Observed carriers (2429, 2453.5, 2459.75, 2465.6, 2476) do not cleanly match either SDK table; D8 may use a different table | L | O11 |
 
+### Timing (step 1, 2026-11-25)
+
+| # | Finding | Conf. | Evidence |
+|---|---|---|---|
+| T1 | Consecutive search attempts are **531 µs apart** (531.2, 531.8, 531.3 µs in three gap-free captures), each on a different channel — matches SDK "retry + hop after every missed ACK" | H (3/3 pairs, matched filter on full known frame incl. CRC, r ≈ 0.65–0.71) | runs `t6A` (board A, centre 2462), `t6B` (board B, centre 2425); `tools/analyze_iq/esb_match.py` |
+| T2 | In ESP-SDR `RINGCAP` at 40 MS/s, carrier estimates read ≈ +4.9 MHz above the 16 MS/s `CAP16` values (e.g. 2480.75 vs 2476.0, 2448.75 vs 2443.75). Absolute frequency calibration of the 40 MS/s mode pending (planned: tone from board B) | M | same runs |
+
 SDK link procedure (reference, unverified for D8): dongle must reply on the same channel ~80–100 µs after the request with `ack_pairing` (type `0x80`, echoed `did`, non-zero changing `tick`, `chn` mask, `gid1` = new data access code); keyboard then sends key reports (`pkt_km`, 8-byte `{cnt, ctrl_key, keycode[6]}`) on pipe 2 and expects `ack_keyboard` replies. No encryption in this SDK build.
 
 ## Not established

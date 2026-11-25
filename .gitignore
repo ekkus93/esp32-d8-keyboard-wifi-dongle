@@ -79,3 +79,8 @@ docs/ref/
 
 # Local scratch
 tmp/
+
+# ESP-IDF
+sdkconfig
+sdkconfig.old
+managed_components/

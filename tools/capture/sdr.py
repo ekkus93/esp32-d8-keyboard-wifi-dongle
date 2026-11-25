@@ -19,7 +19,7 @@ RATES_MSPS = {0: 80, 1: 40, 2: 20, 3: 10, 4: 8, 5: 4, 6: 16, 7: 32, 8: 10.667, 9
 
 
 class Sdr:
-    def __init__(self, port: str = "/dev/ttyACM0", timeout: float = 3.0):
+    def __init__(self, port: str = "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_9C:13:9E:AC:5B:4C-if00", timeout: float = 3.0):
         self.s = serial.Serial(port, 2_000_000, timeout=timeout)
         self.sync()
 
@@ -97,7 +97,7 @@ def save(path: Path, iq: np.ndarray, meta: dict) -> None:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--port", default="/dev/ttyACM0")
+    ap.add_argument("--port", default="/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_9C:13:9E:AC:5B:4C-if00")
     ap.add_argument("cmd", nargs="+", help="raw protocol command, e.g. INFO or 'LIMITS?'")
     a = ap.parse_args()
     sdr = Sdr(a.port)

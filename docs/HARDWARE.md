@@ -19,6 +19,19 @@ Observed 2026-11-25 via `esptool chip_id` / `flash_id` (esptool v5.7.0) on the d
 
 Implication: diagnostics and flashing currently share the native USB PHY with any future USB OTG HID build. A separate UART bridge (GPIO43/44) is needed before HID builds (SPEC §4).
 
+## Receiver board B (second ESP32-S3)
+
+Added 2026-11-25 by owner for TX/RX cross-checks; may be flashed freely.
+
+| Item | Value |
+|---|---|
+| Chip | ESP32-S3 (QFN56) rev v0.2, 16 MB flash (0x68/0x4018), 8 MB embedded PSRAM, 40 MHz crystal |
+| MAC / USB serial | `9c:13:9e:ac:5c:f8` → `/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_9C:13:9E:AC:5C:F8-if00` |
+| Board A for reference | `9c:13:9e:ac:5b:4c` → `/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_9C:13:9E:AC:5B:4C-if00` |
+| Quirk | After flashing, esptool's RTS hard reset leaves board B in ROM download mode (`boot:0x0`). Use `--after watchdog-reset` (or `esptool --before no-reset --after watchdog-reset chip-id`) to boot the app. Arrived running a TinyUSB app (`303a:4001`), so the first flash needed BOOT+RESET. |
+
+Always address boards by `/dev/serial/by-id/…`; `ttyACM0/1` numbering can swap.
+
 ## Keyboard (D8)
 
 | Item | Value | Source / confidence |
