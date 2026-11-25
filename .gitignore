@@ -73,3 +73,9 @@ Testing/
 # Python
 .venv/
 __pycache__/
+
+# Vendor reference documents (not redistributable)
+docs/ref/
+
+# Local scratch
+tmp/

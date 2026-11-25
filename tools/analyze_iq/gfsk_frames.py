@@ -23,7 +23,7 @@ from inspect_bursts import FS, fm, lowpass  # noqa: E402
 SPS = 8
 
 
-def frame_bits(iq, s, e, center_mhz, mhz, pad=48):
+def frame_bits(iq, s, e, center_mhz, mhz, pad=160):
     s0, e0 = max(0, s - pad), min(len(iq), e + pad)
     n = np.arange(s0, e0)
     off = (mhz - center_mhz) * 1e6

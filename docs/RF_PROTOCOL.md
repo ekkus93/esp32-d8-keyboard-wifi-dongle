@@ -30,6 +30,23 @@ Status: **early characterization (TODO P3.2–P3.3, P4.3 in progress).** Nothing
 
 The observed frames do not encode which key was pressed. Most consistent explanation: with its receiver absent, the keyboard wakes on a key event and repeats a link/pairing-search request across several channels, waiting for a dongle response that never arrives; key reports would be sent only after a link is established. If correct, **RX-only operation is insufficient** (SPEC §6.3, TODO P6.5): a receiver would need to send the dongle's response, which requires the gated lab-response path and owner approval.
 
+## Decoded frame (2026-11-25, against Telink KM SDK reference)
+
+Reference: Telink keyboard/mouse/dongle SDK snapshot (`8368_keyboard`, `8366_dongle`, `vendor/link_layer`, `vendor/common/rf_frame.h`, `proj_lib/rf_drv_8368.c`) found in a public, **unlicensed** GitHub repo (`stephanosio/js_km_proj` @ `4d9960b`, 2018). Used only as reference; no code copied. The D8 firmware may differ from it.
+
+| # | Finding | Conf. | Evidence |
+|---|---|---|---|
+| D1 | Layout matches SDK/ESB-style framing: preamble (~12 bytes, SDK reg 0x402 = 0x2c) · 5-byte access code (LSB-first bytes; last on-air byte `0x71` = SDK reg 0x408 default; preceding bytes `…AA AA` are SDK dibit-encoded custom ID) · 9-bit header `001011 00 1` (len = 11, PID 0, NO_ACK 1) · payload (MSB-first bytes) · 16-bit CRC | H for header/payload position (24/24 long frames); M for address byte values (first byte merges with preamble) | `frames_all.json`, decode script in session |
+| D2 | Payload (11 bytes) is constant in all clean frames: `51 40 01 00 00 00 00 0c 00 00 10`. SDK `rf_packet_pairing_t`: proto `0x51`, flow `0x40` (TOKEN = link/search request), type `0x01`, rssi 0, per 0, seq_no 0, num 0, did `0x1000000C` (LE). Deviating frames differ by isolated bits (bit errors) | H | 24 long frames across 2429–2476 MHz, tap/hold/idle |
+| D3 | **CRC identified: nRF24 Enhanced ShockBurst CRC-16** — poly 0x1021, init 0xFFFF, no final XOR, MSB-first over on-air access code (40 bits) + 9-bit header + payload. On-air access code bits `01010101 01011001 01010101 01010101 10001110` (MSB-first bytes `55 59 55 55 8E`; read LSB-first `AA 9A AA AA 71`, matching SDK reg 0x408 = 0x71 and dibit-coded custom pairing ID). Method: two messages differing in one bit (D8) fixed the polynomial independent of init (CRC xor 0x9496 = x^(76+16) mod 0x1021, flipped bit exactly 76 bits before payload end); standard init 0xFFFF then fits only with this access-code alignment. Verified: **217/217 cleanly received frames pass**; all CRC failures are frames with visible bit errors | H | all runs, verification script in session |
+| D6 | Trial `t4_escq_poweron` (Esc+Q held ~3 s, then power cycle + taps): only the D2 message observed (25 clean copies, plus bit-error variants incl. header length 15 = single-bit flip of 11). No flow 0x10 (manual pairing) or 0x50 (power-on) packets captured; Esc+Q may not be this firmware's pairing combo, or packets were missed (~2.5 % capture duty, SDK power-on packets use −24 dBm) | M | run `t4_escq_poweron` |
+| D8 | Power-on packet observed (keyboard placed on the receiver, ~10 power cycles): `51 50 01 00 00 00 00 0c 00 00 10`, CRC `0xA441` (2 CRC-valid copies) — flow `0x50` = TOKEN|PARING, as SDK predicts for the first ~0.5 s after power-on | H | run `t5_poweron_close` |
+| D7 | Burst length ≈ 120–126 µs ≈ 12-byte preamble + 40 + 9 + 88 + 16 bits, i.e. the frame ends right after the 16-bit trailer | M | burst durations |
+| D4 | Keyboard transmits on the **pairing pipe** with a fixed `did`, i.e. consistent with an SDK keyboard that has no usable stored dongle binding (SDK: bound keyboards send `pkt_km` on pipe 2 with the dongle's access code). `seq_no` stays 0 unlike SDK source (`seq_no++` per loop) — firmware differs from this snapshot | M | D2 |
+| D5 | SDK channels are integer MHz `2400 + table[i]`; search mode steps index `(i+6)&14`. Observed carriers (2429, 2453.5, 2459.75, 2465.6, 2476) do not cleanly match either SDK table; D8 may use a different table | L | O11 |
+
+SDK link procedure (reference, unverified for D8): dongle must reply on the same channel ~80–100 µs after the request with `ack_pairing` (type `0x80`, echoed `did`, non-zero changing `tick`, `chn` mask, `gid1` = new data access code); keyboard then sends key reports (`pkt_km`, 8-byte `{cnt, ctrl_key, keycode[6]}`) on pipe 2 and expects `ack_keyboard` replies. No encryption in this SDK build.
+
 ## Not established
 
 Sync/access-address boundary, byte alignment, length field, CRC algorithm (16-bit CCITT/IBM/DNP/T10 brute force: no hit distinguishable from chance), payload mapping, press vs release frames, channel hopping, retransmit timing, whether an ACK/dongle response is expected.
