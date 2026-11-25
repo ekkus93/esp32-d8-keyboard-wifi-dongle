@@ -21,7 +21,8 @@ At the time of writing the repo is docs-only; the ESP-IDF scaffold (P0) does not
 ## Git
 
 - Commit directly to `master`. Never push without asking first.
-- Project license is Apache-2.0; audit third-party code (ESP-SDR, Halo bridge) for license compatibility before copying it (P0.4, `docs/THIRD_PARTY.md`).
+- Project license is GPL-3.0-only (changed from Apache-2.0 on 2026-11-25 so ESP-SDR / Halo bridge code can be reused). Keep upstream copyright/SPDX headers on reused files and list them in `docs/THIRD_PARTY.md`. Never copy code from unlicensed sources (e.g. the Telink KM SDK in `~/esp/ref/telink_km`) — use them as protocol reference only.
+- Owner approved RF transmission experiments on 2026-11-25 (lab build only, low power, aimed at the owner's keyboard). Normal receiver builds still must not transmit anything beyond the verified link responses.
 
 ## Rules that are easy to break
 
